@@ -1,0 +1,29 @@
+<!DOCTYPE HTML>
+<head>
+</head>
+<body>
+	<div>Bienvenue sur Middle</div>
+	<div>la plateforme de transfert vers les bases gouvernementales</div>
+	<div>
+		<form action="/load" name="formulaire_sub" method="post"
+			enctype="multipart/form-data">
+			<div>
+				<input id="file" name="file" type="file" accept=".csv,.xml"
+					class="form-control"></input>
+			</div>
+			<div>
+				<select class="form-control" id="type" name="type">
+					<option value="CSV">CSV</option>
+					<option value="XML">XML</option>
+				</select>
+			</div>
+			<div>
+				<label for="emmeteur">Emmeteur : </label><input type="text" name="emmeteur" id="emmeteur"></input>
+			</div>
+			<div>
+				<input type="submit" value="SUBMIT">
+			</div>
+		</form>
+
+	</div>
+</body>
