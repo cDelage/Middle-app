@@ -14,23 +14,13 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
 
-import org.apache.http.NameValuePair;
-import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.util.EntityUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -46,13 +36,13 @@ import com.opencsv.CSVReader;
 @Component
 public class FileReaderService implements IFileReaderService {
 
+	private static final String PARSE_EXCEPTION = "Parse exception : {}";
 	private static final String SENDING_PROCESS_START = "Sending process start";
-	private static final String LOG_FAILED_SEND_TO_GOUV = "Failed to send %FILE% to gouv : ";
+	private static final String LOG_FAILED_SEND_TO_GOUV = "Failed to send {} to gouv : {}";
 	private static final String FAILED_TO_READ_XML = "Failed to read xml file cause : {}";
-	private static final String FAILED_TO_CONSTRUCT_ERROR_FILE = "Failed to construct error file : {}";
 	private static final String NA = "NA";
 	private static final String ERROR = "ERROR";
-	private static final String CATCH_EXCEPTION_DURING_READ_CSV = "Catch exception during read CSV : ";
+	private static final String CATCH_EXCEPTION_DURING_READ_CSV = "Catch exception during read CSV : {}";
 	private static final String XML = "XML";
 	private static final String CSV = "CSV";
 	private static final String WAIT = "WAIT";
@@ -66,7 +56,7 @@ public class FileReaderService implements IFileReaderService {
 	private MemoryFileUpload memoryFileUpload;
 
 	@Override
-	public void readCSVFile(String path, String emmeteur) {
+	public FileKeyValueDTO readCSVFile(String path, String emmeteur) {
 		LOG.info(LOG_START_CSV, path);
 
 		try {
@@ -83,49 +73,50 @@ public class FileReaderService implements IFileReaderService {
 				datas.add(data);
 			}
 			csvReader.close();
-			constructFile(path, datas, CSV, emmeteur);
+			return constructFile(path, datas, CSV, emmeteur);
 
 		} catch (Exception exception) {
 			LOG.error(CATCH_EXCEPTION_DURING_READ_CSV, exception);
-			try {
-				constructErrorFile(emmeteur, CSV, exception.getLocalizedMessage());
-			} catch (ParseException e) {
-				LOG.error(FAILED_TO_CONSTRUCT_ERROR_FILE, e);
-			}
+			return constructErrorFile(emmeteur, CSV, exception.getLocalizedMessage());
+		
 		}
 
 	}
 
 	@Override
-	public void readXMLFile(String path, String emmeteur) {
+	public FileKeyValueDTO readXMLFile(String path, String emmeteur) {
 		try {
 			List<KeyValueDTO> datas = unmarshall(path).getDatas();
-			constructFile(path, datas, XML, emmeteur);
+			return constructFile(path, datas, XML, emmeteur);
 		} catch (Exception e) {
 			LOG.error(FAILED_TO_READ_XML, e);
-			try {
-				constructErrorFile(emmeteur, XML, e.getLocalizedMessage());
-			} catch (ParseException exception) {
-				LOG.error(FAILED_TO_CONSTRUCT_ERROR_FILE, exception);
-			}
+			return constructErrorFile(emmeteur, XML, e.getLocalizedMessage());
 		}
+		 
 	}
 
 	@Override
-	public void constructErrorFile(String emmeteur, String type, String error) throws ParseException {
+	public FileKeyValueDTO constructErrorFile(String emmeteur, String type, String error) {
 		FileKeyValueDTO fileDataDTO = new FileKeyValueDTO();
 		String nowString = formatter.format(new java.util.Date());
-		Date now = formatter.parse(nowString);
-		fileDataDTO.setEmmeteur(emmeteur);
-		fileDataDTO.setStatusLecture(ERROR);
-		fileDataDTO.setStatusEnvoi(NA);
-		fileDataDTO.setDateReception(now);
-		fileDataDTO.setError(error);
+		try {
+			Date now = formatter.parse(nowString);
+			fileDataDTO.setEmmeteur(emmeteur);
+			fileDataDTO.setStatusLecture(ERROR);
+			fileDataDTO.setStatusEnvoi(NA);
+			fileDataDTO.setDateReception(now);
+			fileDataDTO.setError(error);
+				
+		}catch(ParseException exception) {
+			LOG.error(PARSE_EXCEPTION, exception);
+		}
+		
 		memoryFileUpload.addFile(fileDataDTO);
+		return fileDataDTO;
 	}
-
+	
 	@Override
-	public void constructFile(String path, List<KeyValueDTO> datas, String type, String emmeteur)
+	public FileKeyValueDTO constructFile(String path, List<KeyValueDTO> datas, String type, String emmeteur)
 			throws ParseException {
 		FileKeyValueDTO fileDataDTO = new FileKeyValueDTO();
 		String nowString = formatter.format(new java.util.Date());
@@ -141,10 +132,13 @@ public class FileReaderService implements IFileReaderService {
 		try {
 			sendFileToGouv(fileDataDTO);
 		}catch(Exception e) {
-			LOG.error(LOG_FAILED_SEND_TO_GOUV, fileDataDTO.getName());
+			System.out.println(e.getLocalizedMessage());
+			System.out.println(e.getMessage());
+			LOG.error(LOG_FAILED_SEND_TO_GOUV, fileDataDTO.getName(), e);
 			fileDataDTO.setStatusEnvoi(ERROR);
+			
 		}
-		
+		return fileDataDTO;
 	}
 
 	@Override
@@ -172,7 +166,6 @@ public class FileReaderService implements IFileReaderService {
 		conn.setDoOutput(true);
 		conn.setRequestMethod("POST");
 		conn.setRequestProperty("Content-Type", "application/json");
-		JSONObject jsonReq = new JSONObject();
 		StringBuilder req = new StringBuilder("{all:[");
 		for(KeyValueDTO data : file.getDatas()) {
 			req.append(new JSONObject(data).toString());
@@ -183,9 +176,17 @@ public class FileReaderService implements IFileReaderService {
 		OutputStream os = conn.getOutputStream();
 		os.write(req.toString().getBytes());
 		os.flush();
-		if (conn.getResponseCode() != HttpURLConnection.HTTP_CREATED) {
+		if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
 			throw new RuntimeException("Failed : HTTP error code : "
 				+ conn.getResponseCode());
+		}else {
+			//Set status done
+			file.setStatusEnvoi(DONE);
+			
+			//Set send date
+			String nowString = formatter.format(new java.util.Date());
+			Date now = formatter.parse(nowString);
+			file.setDateEnvoi(now);
 		}
 		
 		BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));

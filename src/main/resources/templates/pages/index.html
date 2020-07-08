@@ -2,8 +2,8 @@
 <head>
 </head>
 <body>
-	<div>Bienvenue sur Middle</div>
-	<div>la plateforme de transfert vers les bases gouvernementales</div>
+	<div>Bienvenue sur OpenDATA</div>
+	<div>la plateforme de transfert de donnees vers les bases gouvernementales</div>
 	<div>
 		<form action="/load" name="formulaire_sub" method="post"
 			enctype="multipart/form-data">
@@ -18,12 +18,14 @@
 				</select>
 			</div>
 			<div>
-				<label for="emmeteur">Emmeteur : </label><input type="text" name="emmeteur" id="emmeteur"></input>
+				<label for="emmeteur">Emetteur : </label><input type="text" name="emmeteur" id="emmeteur"></input>
 			</div>
 			<div>
 				<input type="submit" value="SUBMIT">
 			</div>
 		</form>
-
+	<div>
+		<p th:text="${MESSAGE}"></p>
+	</div>
 	</div>
 </body>

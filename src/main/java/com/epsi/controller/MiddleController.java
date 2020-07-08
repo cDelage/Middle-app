@@ -10,16 +10,22 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.epsi.entity.FileKeyValueDTO;
 import com.epsi.services.IFileReaderService;
 
 @Controller
 public class MiddleController {
+	private static final String FILE2 = "%FILE%";
+	private static final String FILE_SEND_ERROR = "Votre fichier %FILE% n'a pas été envoyé, veuillez contacter votre administrateur";
+	private static final String MESSAGE = "MESSAGE";
+	private static final String FILE_SEND = "Votre fichier %FILE% à bien été envoyé";
 	private static final String XML = "XML";
 	private static final String CSV = "CSV";
 	private static final String FAIL_TO_LOAD_FILE = "Fail to load file, catch exception : ";
@@ -43,7 +49,7 @@ public class MiddleController {
 	}
 	
 	@PostMapping(LOAD_PATH)
-	public String postMapping(@RequestParam(UPLOADED_FILE) MultipartFile file, @ModelAttribute("type") String type, @ModelAttribute("emmeteur") String emmeteur) {
+	public String postMapping(@RequestParam(UPLOADED_FILE) MultipartFile file, @ModelAttribute("type") String type, @ModelAttribute("emmeteur") String emmeteur, ModelMap modelMap) {
 		LOG.info(TRY_TO_UPLOAD_NEW_FILE);
 		try {
 			// If folder not exist -> create.
@@ -58,20 +64,26 @@ public class MiddleController {
 			Path filePath = Paths.get(uploadPath, file.getOriginalFilename());
 			file.transferTo(filePath);
 			LOG.info(UPLOADED_SAVED, filePathString.toString(), type, emmeteur);
-			
+			String statusEnvoi = new String();
 			switch(type) {
 			case CSV:
-				fileReaderService.readCSVFile(filePathString.toString(), emmeteur);
+				FileKeyValueDTO fileSend = fileReaderService.readCSVFile(filePathString.toString(), emmeteur);
+				statusEnvoi = fileSend.getStatusEnvoi();
 				break;
 			case XML:
-				fileReaderService.readXMLFile(filePathString.toString(), emmeteur);
+				FileKeyValueDTO fileSendXML = fileReaderService.readXMLFile(filePathString.toString(), emmeteur);
+				statusEnvoi = fileSendXML.getStatusEnvoi();
 				break;
 			}
 			
+			if(statusEnvoi == "DONE") {
+				modelMap.put(MESSAGE, FILE_SEND.replace(FILE2, file.getOriginalFilename()));	
+			}else {
+				modelMap.put(MESSAGE, FILE_SEND_ERROR.replace(FILE2, file.getOriginalFilename()));
+			}
 		}catch(IOException e) {
 			LOG.error(FAIL_TO_LOAD_FILE, e);
 		}
-		
 		return PAGES_INDEX;
 	}
 }

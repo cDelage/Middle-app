@@ -13,15 +13,15 @@ import com.epsi.entity.FileKeyValueDTO;
 
 public interface IFileReaderService {
 
-	public void readCSVFile(String path, String emmeteur);
+	public FileKeyValueDTO readCSVFile(String path, String emmeteur);
 	
 	public DataListDTO unmarshall(String path) throws InstantiationException, IllegalAccessException, JAXBException, SAXException;
 	
-	public void constructFile(String path, List<KeyValueDTO> datas, String type, String emmeteur) throws ParseException;
+	public FileKeyValueDTO constructFile(String path, List<KeyValueDTO> datas, String type, String emmeteur) throws ParseException;
 	
-	public void readXMLFile(String path, String emmeteur);
+	public FileKeyValueDTO readXMLFile(String path, String emmeteur);
 	
-	public void constructErrorFile(String emmeteur, String type, String error) throws ParseException;
+	public FileKeyValueDTO constructErrorFile(String emmeteur, String type, String error) throws ParseException;
 	
 	public void sendFileToGouv(FileKeyValueDTO file) throws Exception;
 }
